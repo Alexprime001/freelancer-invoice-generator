@@ -1,12 +1,13 @@
-
 import React, { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, Download } from "lucide-react";
 import { LineItem, Invoice, BusinessDetails, ClientInfo } from "@/types/invoice";
+import jsPDF from "jspdf";
+import autoTable from 'jspdf-autotable';
 
 const initialInvoice: Invoice = {
   id: crypto.randomUUID(),
@@ -111,6 +112,73 @@ export const InvoiceForm = () => {
         tax,
         total,
       };
+    });
+  };
+
+  const generatePDF = () => {
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.width;
+    
+    // Add business details
+    doc.setFontSize(20);
+    doc.text("INVOICE", pageWidth / 2, 20, { align: "center" });
+    
+    doc.setFontSize(12);
+    doc.text(`Invoice #: ${invoice.invoiceNumber}`, 14, 30);
+    doc.text(`Date: ${invoice.date}`, 14, 37);
+    doc.text(`Due Date: ${invoice.dueDate}`, 14, 44);
+
+    // Business details
+    doc.setFontSize(14);
+    doc.text("From:", 14, 60);
+    doc.setFontSize(12);
+    doc.text([
+      invoice.businessDetails.name,
+      invoice.businessDetails.address,
+      invoice.businessDetails.email,
+      invoice.businessDetails.phone
+    ], 14, 70);
+
+    // Client details
+    doc.setFontSize(14);
+    doc.text("Bill To:", 14, 100);
+    doc.setFontSize(12);
+    doc.text([
+      invoice.clientInfo.name,
+      invoice.clientInfo.address,
+      invoice.clientInfo.email,
+      invoice.clientInfo.phone
+    ], 14, 110);
+
+    // Line items table
+    const tableData = invoice.lineItems.map(item => [
+      item.description,
+      item.quantity.toString(),
+      `$${item.rate.toFixed(2)}`,
+      `$${item.amount.toFixed(2)}`
+    ]);
+
+    autoTable(doc, {
+      startY: 140,
+      head: [["Description", "Quantity", "Rate", "Amount"]],
+      body: tableData,
+    });
+
+    // Calculate the Y position after the table
+    const finalY = (doc as any).lastAutoTable.finalY + 10;
+
+    // Add totals
+    doc.text(`Subtotal: $${invoice.subtotal.toFixed(2)}`, pageWidth - 60, finalY + 10);
+    doc.text(`Tax (10%): $${invoice.tax.toFixed(2)}`, pageWidth - 60, finalY + 20);
+    doc.setFontSize(14);
+    doc.text(`Total: $${invoice.total.toFixed(2)}`, pageWidth - 60, finalY + 30);
+
+    // Save PDF
+    doc.save(`invoice-${invoice.invoiceNumber}.pdf`);
+    
+    toast({
+      title: "Success",
+      description: "Invoice PDF has been generated",
     });
   };
 
@@ -284,6 +352,15 @@ export const InvoiceForm = () => {
       </Card>
 
       <div className="flex justify-end space-x-4">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={generatePDF}
+          className="px-6 py-2 transition-all hover:scale-105 flex items-center gap-2"
+        >
+          <Download className="w-4 h-4" />
+          Download PDF
+        </Button>
         <Button
           type="submit"
           className="px-6 py-2 transition-all hover:scale-105"
